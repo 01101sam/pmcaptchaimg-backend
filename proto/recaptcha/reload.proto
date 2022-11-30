@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+message ReloadRequest {
+  string version = 1;
+  string recaptcha_token = 2;
+  string unknown_field_3 = 3;
+  string bot_guard_token = 4;
+  int32 vi = 5;
+  string reload_type = 6;
+  string unknown_field_7 = 7;
+  string site_key = 14;
+  string unknown_field_16 = 16;
+}
