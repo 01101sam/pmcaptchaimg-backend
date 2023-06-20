@@ -1,15 +1,13 @@
-import fetch from 'node-fetch';
 import jsdom from 'jsdom';
-import {createCanvas, Image, loadImage} from "canvas";
+import fetch from 'node-fetch';
+import {createCanvas, loadImage} from "canvas";
 import protobuf from "protobufjs";
 import ascii85 from "ascii85";
 
 
 const
     randInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min,
-    UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/100.0.4896.75",
-    {JSDOM} = jsdom,
-    {window} = new JSDOM(null, {runScripts: 'outside-only'});  // FunCaptcha
+    {JSDOM} = jsdom;
 
 let ReloadRequestProto;
 protobuf.load("./proto/recaptcha/reload.proto", (err, root) => {
@@ -17,25 +15,675 @@ protobuf.load("./proto/recaptcha/reload.proto", (err, root) => {
     ReloadRequestProto = root.lookupType("ReloadRequest");
 });
 
+class FunCaptchaAssertCache {
+    constructor() {
+        this.host = "https://api.funcaptcha.com";
+
+        this.jsEnv = null;
+        this.window = null;
+        this.fingerPrintFunc = null;
+        this.buildRequestFunc = null;
+
+        this.lastUpdate = 0;
+        this.expireTime = 24 * 60 * 60 * 1000;
+
+        this.endpointRgx = /(https?:\/\/api\.funcaptcha\.com\/cdn\/fc\/js\/[a-f\d]{40}\/standard\/)funcaptcha_api\.js/;
+    }
+
+    async update() {
+        if (Date.now() - this.lastUpdate < this.expireTime) return true;
+        if (this.window) this.window.close();
+        this.jsEnv = new JSDOM(``, {runScripts: 'outside-only'});
+        this.window = this.jsEnv.window;
+        let resp, endpoint;
+        console.debug("Getting js asserts endpoint...");
+        try {
+            resp = await fetch(`${this.host}/fc/api/`);
+            if (resp.status !== 200) return console.error("Failed to fetch assert endpoint");
+            endpoint = this.endpointRgx.exec(await resp.text());
+            if (!endpoint || !endpoint[1]) return console.error("Failed to parse assert endpoint");
+            endpoint = endpoint[1];
+        } catch (e) {
+            return console.error("Failed to get js asserts endpoint:", e);
+        }
+        const scripts = [];
+        for (const fileName of ["funcaptcha_api.js", "meta_bootstrap.js"]) scripts.push((async () => {
+            console.debug(`Fetching ${fileName}`);
+            resp = await fetch(`${endpoint}/${fileName}`);
+            if (resp.status !== 200) return console.error(`Failed to fetch ${fileName}`);
+            this.window.eval(await resp.text());
+            return true;
+        })());
+        try {
+            for (const result of await Promise.all(scripts)) if (!result) return;
+        } catch (e) {
+            return console.error("Failed to fetch js asserts:", e);
+        }
+        if (!this.window['fc_fp']) return console.error("Failed to get FunCaptcha fingerprint function from funcaptcha_api.js");
+        this.fingerPrintFunc = this.window['fc_fp'];
+        if (!this.window['build_request']) return console.error("Failed to get build_request function from meta_bootstrap.js");
+        this.buildRequestFunc = this.window['build_request'];
+        this.decryptFunc = this.window['decrypt'];
+        this.lastUpdate = Date.now();
+        return true;
+    }
+
+    get buildRequest() {
+        return this.buildRequestFunc;
+    }
+
+    get decrypt() {
+        return this.decryptFunc;
+    }
+
+    get fingerPrint() {
+        return this.fingerPrintFunc;
+    }
+
+    get canvasFP() {
+        return this.fingerPrintFunc['canvasFP'];
+    }
+}
+
+const cache = new FunCaptchaAssertCache();  // FunCaptcha
+
 export class FunCaptcha {
     constructor() {
-        this.captchaVersion = null;
+        // Fixed define
         this.captchaEndpoint = "https://api.funcaptcha.com";
         this.publicKey = "69A21A01-CC7B-B9C6-0F9A-E7FA06677FFC";
+        this.userAgent = [
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+            "AppleWebKit/537.36 (KHTML, like Gecko)",
+            "Chrome/103.0.5060.114"
+        ].join(" ");
+
+        this.captchaVersion = null;
         this.token = null;
         this.tokenFull = null;
         this.challengeID = null;
 
         // Cache
-        this._cachedBuildRequestFunc = null;
         this.exampleImgs = null;
+        this.decryptionKey = null;
     }
 
+    _generateBDA() {
+        console.debug("Generating fingerprint...");
+        const
+            L51 = S01 => {
+                let X01, U01 = 0;
+                if (!S01) return "";
+                else if (S01.length === 0) return U01;
+                if (Array.prototype.reduce)
+                    return S01.split("").reduce((V01, y01) => {
+                        V01 = (V01 << 5) - V01 + y01.charCodeAt(0);
+                        return V01 & V01;
+                    }, 0);
+                for (let d01 = 0; d01 < S01.length; d01++) {
+                    X01 = S01.charCodeAt(d01);
+                    U01 = (U01 << 5) - U01 + X01;
+                    U01 = U01 & U01;
+                }
+                return U01;
+            },
+            FunCaptchaAPI = cache.fingerPrint,
+            currTS = new Date().getTime() / 1000,
+            aesSecret = this.userAgent + Math.round(currTS - currTS % 21600),
+            feObjValues = [
+                {
+                    "key": "DNT",  // "Do Not Track"
+                    "value": "1"
+                },
+                {
+                    "key": "L",  // Language
+                    "value": "en-US"
+                },
+                {
+                    "key": "D", // Depth (screen.colorDepth)
+                    "value": 24 // crypto.randomInt(12, 24)
+                },
+                {
+                    "key": "PR",  // Pixel Ratio
+                    "value": 1.25 // (Math.random() * (2 - 1) + 1).toFixed(2).toString()
+                },
+                {
+                    "key": "S",  // Screen
+                    "value": [
+                        1536,
+                        864
+                    ]
+                },
+                {
+                    "key": "AS",  // Available Screen
+                    "value": [
+                        1536,
+                        864
+                    ]
+                },
+                {
+                    "key": "TO",  // Time Offset
+                    "value": -480
+                },
+                {
+                    "key": "SS",  // Session Storage (window.sessionStorage exists)
+                    "value": true
+                },
+                {
+                    "key": "LS",  // Local Storage (window.localStorage exists)
+                    "value": true
+                },
+                {
+                    "key": "IDB",  // IndexedDB (window.indexedDB exists)
+                    "value": true
+                },
+                {
+                    "key": "B",  // Behaviour (document.body.addBehavior)
+                    "value": false
+                },
+                {
+                    "key": "ODB",  // OpenDB (window.openDatabase exists)
+                    "value": true
+                },
+                {
+                    "key": "CPUC",  // CPU Class (navigator.cpuClass value)
+                    "value": "unknown"
+                },
+                {
+                    "key": "PK",  //  Platform Key (navigator.platform value)
+                    "value": "unknown"
+                },
+                {
+                    "key": "CFP",  // Canvas Fingerprint
+                    "value": cache.canvasFP()
+                },
+                {
+                    "key": "FR",  // Has Fake Resolution
+                    "value": false
+                },
+                {
+                    "key": "FOS",  // Has Fake OS
+                    "value": false
+                },
+                {
+                    "key": "FB",  // Fake Browser
+                    "value": false
+                },
+                {
+                    "key": "JSF",  // JS Fonts
+                    "value": [
+                        "Arial",
+                        "Arial Black",
+                        "Arial Narrow",
+                        "Book Antiqua",
+                        "Bookman Old Style",
+                        "Calibri",
+                        "Cambria",
+                        "Cambria Math",
+                        "Century",
+                        "Century Gothic",
+                        "Century Schoolbook",
+                        "Comic Sans MS",
+                        "Consolas",
+                        "Courier",
+                        "Courier New",
+                        "Garamond",
+                        "Geneva",
+                        "Georgia",
+                        "Helvetica",
+                        "Impact",
+                        "Lucida Bright",
+                        "Lucida Calligraphy",
+                        "Lucida Console",
+                        "Lucida Fax",
+                        "LUCIDA GRANDE",
+                        "Lucida Handwriting",
+                        "Lucida Sans",
+                        "Lucida Sans Typewriter",
+                        "Lucida Sans Unicode",
+                        "Microsoft Sans Serif",
+                        "Monotype Corsiva",
+                        "MS Gothic",
+                        "MS Outlook",
+                        "MS PGothic",
+                        "MS Reference Sans Serif",
+                        "MS Sans Serif",
+                        "MS Serif",
+                        "MYRIAD",
+                        "Palatino Linotype",
+                        "Segoe Print",
+                        "Segoe Script",
+                        "Segoe UI",
+                        "Segoe UI Light",
+                        "Segoe UI Semibold",
+                        "Segoe UI Symbol",
+                        "Tahoma",
+                        "Times",
+                        "Times New Roman",
+                        "Times New Roman PS",
+                        "Trebuchet MS",
+                        "Verdana",
+                        "Wingdings",
+                        "Wingdings 2",
+                        "Wingdings 3"
+                    ]
+                },
+                {
+                    "key": "P",  // Plugins Key
+                    "value": [
+                        "Chrome PDF Viewer::Portable Document Format::application/pdf~pdf,text/pdf~pdf",
+                        "Chromium PDF Viewer::Portable Document Format::application/pdf~pdf,text/pdf~pdf",
+                        "Microsoft Edge PDF Viewer::Portable Document Format::application/pdf~pdf,text/pdf~pdf",
+                        "PDF Viewer::Portable Document Format::application/pdf~pdf,text/pdf~pdf",
+                        "WebKit built-in PDF::Portable Document Format::application/pdf~pdf,text/pdf~pdf"
+                    ]
+                },
+                {
+                    "key": "T",  // Touch
+                    "value": [
+                        0,
+                        false,
+                        false
+                    ]
+                },
+                {
+                    "key": "H",  // Hardware Concrun (navigator.hardwareConcurrency value)
+                    "value": 12 // crypto.randomInt(1, 128)
+                },
+                {
+                    "key": "SWF",  // Has https://github.com/swfobject/swfobject (window.swfobject value)
+                    "value": false
+                }
+            ],
+            webGLKeys = [
+                {
+                    "key": "webgl_extensions",
+                    "value": "ANGLE_instanced_arrays;EXT_blend_minmax;EXT_color_buffer_half_float;EXT_disjoint_timer_query;EXT_float_blend;EXT_frag_depth;EXT_shader_texture_lod;EXT_texture_compression_bptc;EXT_texture_compression_rgtc;EXT_texture_filter_anisotropic;EXT_sRGB;KHR_parallel_shader_compile;OES_element_index_uint;OES_fbo_render_mipmap;OES_standard_derivatives;OES_texture_float;OES_texture_float_linear;OES_texture_half_float;OES_texture_half_float_linear;OES_vertex_array_object;WEBGL_color_buffer_float;WEBGL_compressed_texture_s3tc;WEBGL_compressed_texture_s3tc_srgb;WEBGL_debug_renderer_info;WEBGL_debug_shaders;WEBGL_depth_texture;WEBGL_draw_buffers;WEBGL_lose_context;WEBGL_multi_draw"
+                },
+                {
+                    "key": "webgl_extensions_hash",
+                    "value": "00000000000000000000000000000000"
+                },
+                {
+                    "key": "webgl_renderer",
+                    "value": "WebKit WebGL"
+                },
+                {
+                    "key": "webgl_vendor",
+                    "value": "WebKit"
+                },
+                {
+                    "key": "webgl_version",
+                    "value": "WebGL 1.0 (OpenGL ES 2.0 Chromium)"
+                },
+                {
+                    "key": "webgl_shading_language_version",
+                    "value": "WebGL GLSL ES 1.0 (OpenGL ES GLSL ES 1.0 Chromium)"
+                },
+                {
+                    "key": "webgl_aliased_line_width_range",
+                    "value": "[1, 1]"
+                },
+                {
+                    "key": "webgl_aliased_point_size_range",
+                    "value": "[1, 1024]"
+                },
+                {
+                    "key": "webgl_antialiasing",
+                    "value": "yes"
+                },
+                {
+                    "key": "webgl_bits",
+                    "value": "8,8,24,8,8,0"
+                },
+                {
+                    "key": "webgl_max_params",
+                    "value": "16,32,16384,1024,16384,16,16384,30,16,16,4096"
+                },
+                {
+                    "key": "webgl_max_viewport_dims",
+                    "value": "[32767, 32767]"
+                },
+                {
+                    "key": "webgl_unmasked_vendor",
+                    "value": "Google Inc. (AMD)"
+                },
+                {
+                    "key": "webgl_unmasked_renderer",
+                    "value": "ANGLE (AMD, AMD Radeon(TM) Graphics Direct3D11 vs_5_0 ps_5_0, D3D11)"
+                },
+                {
+                    "key": "webgl_vsf_params",
+                    "value": "23,127,127,23,127,127,23,127,127"
+                },
+                {
+                    "key": "webgl_vsi_params",
+                    "value": "0,31,30,0,31,30,0,31,30"
+                },
+                {
+                    "key": "webgl_fsf_params",
+                    "value": "23,127,127,23,127,127,23,127,127"
+                },
+                {
+                    "key": "webgl_fsi_params",
+                    "value": "0,31,30,0,31,30,0,31,30"
+                },
+                {
+                    "key": "webgl_hash_webgl",
+                    "value": "00000000000000000000000000000000"
+                },
+                {
+                    "key": "user_agent_data_brands",
+                    "value": "Not.A/Brand,Chromium"
+                },
+                {
+                    "key": "user_agent_data_mobile",
+                    "value": false
+                },
+                {
+                    "key": "navigator_connection_downlink",
+                    "value": 10
+                },
+                {
+                    "key": "navigator_connection_downlink_max",
+                    "value": null
+                },
+                {
+                    "key": "network_info_rtt",
+                    "value": 50
+                },
+                {
+                    "key": "network_info_save_data",
+                    "value": false
+                },
+                {
+                    "key": "network_info_rtt_type",
+                    "value": null
+                },
+                {
+                    "key": "screen_pixel_depth",
+                    "value": 24
+                },
+                {
+                    "key": "navigator_device_memory",
+                    "value": 8
+                },
+                {
+                    "key": "navigator_languages",
+                    "value": "en-US"
+                },
+                {
+                    "key": "window_inner_width",
+                    "value": 162
+                },
+                {
+                    "key": "window_inner_height",
+                    "value": 150
+                },
+                {
+                    "key": "window_outer_width",
+                    "value": 1536
+                },
+                {
+                    "key": "window_outer_height",
+                    "value": 824
+                },
+                {
+                    "key": "browser_detection_firefox",
+                    "value": false
+                },
+                {
+                    "key": "browser_detection_brave",
+                    "value": false
+                },
+                {
+                    "key": "audio_codecs",
+                    "value": "{\"ogg\":\"probably\",\"mp3\":\"probably\",\"wav\":\"probably\",\"m4a\":\"\",\"aac\":\"\"}"
+                },
+                {
+                    "key": "video_codecs",
+                    "value": "{\"ogg\":\"probably\",\"h264\":\"\",\"webm\":\"probably\",\"mpeg4v\":\"\",\"mpeg4a\":\"\",\"theora\":\"\"}"
+                },
+                {
+                    "key": "media_query_dark_mode",
+                    "value": true
+                },
+                {
+                    "key": "headless_browser_phantom",
+                    "value": false
+                },
+                {
+                    "key": "headless_browser_selenium",
+                    "value": false
+                },
+                {
+                    "key": "headless_browser_nightmare_js",
+                    "value": false
+                },
+                {
+                    "key": "document__referrer",
+                    "value": "https://github.com/"
+                },
+                {
+                    "key": "window__ancestor_origins",
+                    "value": [
+                        "https://github.com"
+                    ]
+                },
+                {
+                    "key": "window__tree_index",
+                    "value": [
+                        0
+                    ]
+                },
+                {
+                    "key": "window__tree_structure",
+                    "value": "[[]]"
+                },
+                {
+                    "key": "window__location_href",
+                    "value": "https://octocaptcha.com/"
+                },
+                {
+                    "key": "client_config__sitedata_location_href",
+                    "value": "https://octocaptcha.com/"
+                },
+                {
+                    "key": "client_config__surl",
+                    "value": null
+                },
+                {
+                    "key": "mobile_sdk__is_sdk"
+                },
+                {
+                    "key": "client_config__language",
+                    "value": null
+                },
+                {
+                    "key": "navigator_battery_charging",
+                    "value": true
+                },
+                {
+                    "key": "audio_fingerprint",
+                    "value": "0"
+                }
+            ],
+            webGLKeyValue = {},
+            feValues = [],
+            fpResult = [
+                {
+                    "value": "js",
+                    "key": "api_type"
+                },
+                {
+                    "value": 1,
+                    "key": "p"
+                },
+                {
+                    "key": "f",
+                    "value": FunCaptchaAPI['x64hash128'](feValues.join("~~~"), 31) // fingerprint
+                },
+                {
+                    "key": "n", // Now
+                    "value": Buffer.from(Math.round(Date.now() / 1000).toString()).toString('base64')
+                },
+                {
+                    "key": "wh", // Window Hash | Window Proto Chain Hash
+                    "value": "e8ba25df3c5e9c242ffe3db75a89da55|72627afbfd19a741c7da1732218301ac"  // Chrome
+                },
+            ];
+
+        webGLKeys.forEach(x => {
+            webGLKeyValue[x.key] = x.value
+        });
+        for (let key in feObjValues) {
+            let feObject = feObjValues[key];
+            switch (feObject.key) {
+                case "CFP":
+                    feValues.push(`${feObject.key}:${L51(feObject.value)}`);
+                    break;
+                case "P":
+                    let pluginKeyValue, pluginName = [];
+                    for (let key in feObject.value) (pluginKeyValue = feObject.value[key]) && pluginName.push(pluginKeyValue.split("::")[0]);
+                    feValues.push(`${feObject.key}:${pluginName.join(",")}`);
+                    break;
+                default:
+                    feValues.push(`${feObject.key}:${feObject.value}`);
+                    break;
+            }
+            fpResult.push({
+                key: "enhanced_fp",
+                value: [
+                    ...webGLKeys,
+                    {
+                        "key": "webgl_hash_webgl",
+                        "value": FunCaptchaAPI['x64hash128'](Object.values(Object.keys(webGLKeyValue).sort().reduce((o, k) => {
+                            o[k] = webGLKeyValue[k];
+                            return o
+                        }, {})).join(","))
+                    },
+                    {
+                        "key": "user_agent_data_brands",
+                        "value": " Not A;Brand,Chromium,Google Chrome"
+                    },
+                    {
+                        "key": "user_agent_data_mobile",
+                        "value": false
+                    },
+                    {
+                        "key": "navigator_connection_downlink",
+                        "value": 10
+                    },
+                    {
+                        "key": "navigator_connection_downlink_max",
+                        "value": null
+                    },
+                    {
+                        "key": "network_info_rtt",
+                        "value": 50
+                    },
+                    {
+                        "key": "network_info_save_data",
+                        "value": false
+                    },
+                    {
+                        "key": "network_info_rtt_type",
+                        "value": null
+                    },
+                    {
+                        "key": "screen_pixel_depth",
+                        "value": 24
+                    },
+                    {
+                        "key": "navigator_device_memory",
+                        "value": 2
+                    },
+                    {
+                        "key": "navigator_languages",
+                        "value": "en-US"
+                    },
+                    {
+                        "key": "window_inner_width",
+                        "value": 556
+                    },
+                    {
+                        "key": "window_inner_height",
+                        "value": 150
+                    },
+                    {
+                        "key": "window_outer_width",
+                        "value": null
+                    },
+                    {
+                        "key": "window_outer_height",
+                        "value": null
+                    }
+                ]
+            });
+        }
+
+        fpResult.push(...[
+            {
+                "key": "fe",
+                "value": feValues
+            },
+            {
+                "key": "ife_hash",
+                "value": FunCaptchaAPI['x64hash128'](feValues.join(", "), 38)
+            },
+            {
+                "value": 1,
+                "key": "cs"
+            },
+            {
+                "key": "jsbd",
+                "value": "{\"HL\":2,\"NCE\":true,\"DT\":\"OctoCaptcha\",\"NWD\":\"false\",\"DMTO\":1,\"DOTO\":1}"
+            }
+        ]);
+        return Buffer.from(cache.buildRequest(JSON.stringify(fpResult), aesSecret)).toString('base64');
+    }
+
+    async getEncryptionKey() {
+        if (this.decryptionKey) return this.decryptionKey;
+        console.debug("[FunCaptcha] Getting image encryption key...");
+        let resp = await fetch(this.captchaEndpoint + `/fc/ekey/`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': this.userAgent},
+            body: new URLSearchParams({
+                game_token: this.challengeID,
+                sid: 'ap-southeast-1',
+                session_token: this.token,
+            })
+        });
+        resp = await resp.json();
+        console.debug('Response:', JSON.stringify(resp));
+        this.decryptionKey = resp.key;
+        return resp;
+    }
+
+    async _getImage(url) {
+        try {
+            const resp = await fetch(url);
+            if (!resp.ok) return console.error(`Failed to fetch image: ${resp.status} ${resp.statusText}`);
+            if (resp.headers.get("content-type").includes("application/json")) {
+                // Decode Encoded Image
+                return console.error(`Decrypt image is not supported yet`);
+                // return cache.decrypt(await resp.json(), await this.getEncryptionKey());
+            } else {
+                // Image is not encoded
+                return await resp.arrayBuffer();
+            }
+        } catch (e) {
+            console.error(`Failed to fetch image: ${e}`);
+        }
+    }
     async getCaptchaImageDisplay(imgUrl) {
         const canvas = createCanvas(400, 400), ctx = canvas.getContext('2d');
         ctx.font = "20px Arial";
+        const buffer = await this._getImage(imgUrl);
+        if (!buffer) return;
+        ctx.drawImage(await loadImage(Buffer.from(buffer)), 50, 150);
         ctx.drawImage(await loadImage(this.exampleImgs['correct']), 150, 5);
-        ctx.drawImage(await loadImage(imgUrl), 50, 150);
 
         // Adding difficulty
 
@@ -85,30 +733,22 @@ export class FunCaptcha {
         return this.captchaVersion === 1 ? {x, y} : {a: x, b: y};
     }
 
-    async _getBuildRequestFunc() {
-        if (this._cachedBuildRequestFunc) return this._cachedBuildRequestFunc;
-        const
-            urlPath = '/cdn/fc/js/3cd822399e15c38e0f212031c7c6190487e33dca/standard/meta_bootstrap.js',
-            resp = await fetch(this.captchaEndpoint + urlPath);
-        if (!(resp.status === 200)) return console.error("Failed to fetch bootstrap script");
-        window.eval(await resp.text());
-        // noinspection JSUnresolvedVariable
-        return this._cachedBuildRequestFunc = window.build_request;
-    }
-
     async getToken(github = true) {
+        if (!await cache.update()) return;
         console.debug("[FunCaptcha] Getting a new token...");
-        await this._getBuildRequestFunc();
+        const browserData = this._generateBDA();
+        if (!browserData) return console.error("[FunCaptcha] Failed to generate a browser fingerprint.");
         let resp = await fetch(this.captchaEndpoint + `/fc/gt2/public_key/${this.publicKey}`, {
             method: 'POST',
-            headers: {'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': UserAgent},
+            headers: {'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': this.userAgent},
             body: new URLSearchParams({
-                bda: "",
+                bda: browserData,
                 public_key: this.publicKey,
                 site: "https://octocaptcha.com",
-                userbrowser: UserAgent,
+                // site: "https://client-demo.arkoselabs.com",
+                userbrowser: this.userAgent,
                 rnd: Math.random().toString(),
-                "data[origin_page]": github ? "github_org_create" : ""
+                "data[origin_page]": github ? "github_signup" : ""
             })
         });
         if (resp.status === 200) {
@@ -157,17 +797,15 @@ export class FunCaptcha {
      * @param answers {[{a: Number, b: Number}]} Captcha position answers
      */
     async solve(answers) {
-        const buildRequest = await this._getBuildRequestFunc();
-        if (!(this.token && buildRequest)) return;
         console.debug('Sending solve request...');
         let resp = await fetch(this.captchaEndpoint + '/fc/ca/', {
             method: 'POST',
-            headers: {'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': UserAgent},
+            headers: {'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': this.userAgent},
             body: new URLSearchParams({
                 game_token: this.challengeID,
                 sid: 'ap-southeast-1',
                 session_token: this.token,
-                guess: buildRequest(JSON.stringify(answers), this.token),
+                guess: cache.buildRequest(JSON.stringify(answers), this.token),
                 analytics_tier: '40',
                 bio: 'eyJtYmlvIjoiIiwidGJpbyI6IiIsImtiaW8iOiIifQ==',
             }),

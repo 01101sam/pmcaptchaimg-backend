@@ -11,14 +11,16 @@ app.use(express.json({type: 'application/*+json'}));
 // region Ark Labs (FunCaptcha)
 
 app.get("/funcaptcha", async (req, res) => {
-    const uuid = ascii85.encode(Buffer.from(crypto.randomUUID().replaceAll("-", ""), "hex")).toString();
+    const uuid = ascii85.encode(Buffer.from(String(crypto.randomUUID()).replaceAll("-", ""), "hex")).toString();
     const captcha = new FunCaptcha();
     if (!await captcha.getToken(req.query['github'] !== void 0)) return res.json({error: "Failed to get token"});
     const result = await captcha.getGameInfo(req.query['hl']);
     if (!result) return res.json({error: "Failed to get captcha info"});
     const [target, challengeImages] = result, images = [];
     for (const imgUrl of challengeImages) {
-        images.push(ascii85.encode(await captcha.getCaptchaImageDisplay(imgUrl)).toString());
+        const imgData = await captcha.getCaptchaImageDisplay(imgUrl);
+        if (!imgData) return res.json({error: "Failed to get captcha image"});
+        images.push(ascii85.encode(imgData).toString());
     }
 
     res.json({
@@ -51,7 +53,7 @@ app.post("/funcaptcha_answer", async (req, res) => {
 // Proto
 
 app.get("/recaptcha", async (req, res) => {
-    const uuid = ascii85.encode(Buffer.from(crypto.randomUUID().replaceAll("-", "").replaceAll("\x00", "*"), "hex")).toString();
+    const uuid = ascii85.encode(Buffer.from(String(crypto.randomUUID()).replaceAll("-", "").replaceAll("\x00", "*"), "hex")).toString();
     const captcha = new ReCaptchaV2();
     const response = await captcha.getCaptcha(null, req.query['hl']);
 
@@ -106,8 +108,8 @@ app.post("/recaptcha_answer", async (req, res) => {
 // endregion
 
 // Uncomment this to enable development environment
-// app.listen(8080, "127.0.0.1", () => {
-//     console.log(`Server is running on port ${port}`);
-// });
+app.listen(8080, "127.0.0.1", () => {
+    console.log(`Dev server is running on port 8080`);
+});
 
 export default createHandler(app);
