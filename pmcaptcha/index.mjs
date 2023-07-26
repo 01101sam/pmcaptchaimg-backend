@@ -34,13 +34,20 @@ app.get("/funcaptcha", async (req, res) => {
 });
 
 app.post("/funcaptcha_answer", async (req, res) => {
-    if (!Object.keys(req.body).length) return res.status(400).end();
+    if (!req.body) return res.status(400).end();
     const captcha = new FunCaptcha();
     captcha.captchaVersion = req.body['version'];
     captcha.challengeID = req.body['challenge_id'];
     captcha.token = req.body['token'];
     const answers = req.body['guess'].map(pos => captcha.getImgArea(Math.floor(pos - 1)));
-    const resp = await captcha.solve(answers);
+    let resp;
+    try {
+        resp = await captcha.solve(answers);
+    } catch (e) {
+        console.error(e);
+        return res.json({error: "Failed to solve captcha cause of server error"});
+    }
+    if (!resp) return res.json({error: "Failed to solve captcha cause of server error"});
     res.json({
         result: resp['solved']
     })

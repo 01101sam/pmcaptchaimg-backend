@@ -5,7 +5,7 @@
   "author": "Sam <sam@0s.hk>",
   "private": true,
   "type": "module",
-  "main": "dev.mjs",
+  "main": "pmcaptcha/index.mjs",
   "dependencies": {
     "@bittrance/azure-function-express": "^2.1.0",
     "ascii85": "^1.0.2",

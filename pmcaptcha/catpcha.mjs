@@ -93,9 +93,9 @@ export class FunCaptcha {
         this.captchaEndpoint = "https://api.funcaptcha.com";
         this.publicKey = "69A21A01-CC7B-B9C6-0F9A-E7FA06677FFC";
         this.userAgent = [
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-            "AppleWebKit/537.36 (KHTML, like Gecko)",
-            "Chrome/103.0.5060.114"
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0)",
+            "Gecko/20100101",
+            "Firefox/113.0"
         ].join(" ");
 
         this.captchaVersion = null;
@@ -128,12 +128,12 @@ export class FunCaptcha {
                 return U01;
             },
             FunCaptchaAPI = cache.fingerPrint,
-            currTS = new Date().getTime() / 1000,
+            currTS = (new Date()).getTime() / 1000,
             aesSecret = this.userAgent + Math.round(currTS - currTS % 21600),
             feObjValues = [
                 {
                     "key": "DNT",  // "Do Not Track"
-                    "value": "1"
+                    "value": "unspecified"
                 },
                 {
                     "key": "L",  // Language
@@ -158,7 +158,7 @@ export class FunCaptcha {
                     "key": "AS",  // Available Screen
                     "value": [
                         1536,
-                        864
+                        824
                     ]
                 },
                 {
@@ -183,7 +183,7 @@ export class FunCaptcha {
                 },
                 {
                     "key": "ODB",  // OpenDB (window.openDatabase exists)
-                    "value": true
+                    "value": false
                 },
                 {
                     "key": "CPUC",  // CPU Class (navigator.cpuClass value)
@@ -191,7 +191,7 @@ export class FunCaptcha {
                 },
                 {
                     "key": "PK",  //  Platform Key (navigator.platform value)
-                    "value": "unknown"
+                    "value": "Win32"
                 },
                 {
                     "key": "CFP",  // Canvas Fingerprint
@@ -298,7 +298,35 @@ export class FunCaptcha {
             webGLKeys = [
                 {
                     "key": "webgl_extensions",
-                    "value": "ANGLE_instanced_arrays;EXT_blend_minmax;EXT_color_buffer_half_float;EXT_disjoint_timer_query;EXT_float_blend;EXT_frag_depth;EXT_shader_texture_lod;EXT_texture_compression_bptc;EXT_texture_compression_rgtc;EXT_texture_filter_anisotropic;EXT_sRGB;KHR_parallel_shader_compile;OES_element_index_uint;OES_fbo_render_mipmap;OES_standard_derivatives;OES_texture_float;OES_texture_float_linear;OES_texture_half_float;OES_texture_half_float_linear;OES_vertex_array_object;WEBGL_color_buffer_float;WEBGL_compressed_texture_s3tc;WEBGL_compressed_texture_s3tc_srgb;WEBGL_debug_renderer_info;WEBGL_debug_shaders;WEBGL_depth_texture;WEBGL_draw_buffers;WEBGL_lose_context;WEBGL_multi_draw"
+                    "value": [
+                        "ANGLE_instanced_arrays",
+                        "EXT_blend_minmax",
+                        "EXT_color_buffer_half_float",
+                        "EXT_float_blend",
+                        "EXT_frag_depth",
+                        "EXT_shader_texture_lod",
+                        "EXT_sRGB",
+                        "EXT_texture_compression_bptc",
+                        "EXT_texture_compression_rgtc",
+                        "EXT_texture_filter_anisotropic",
+                        "OES_element_index_uint",
+                        "OES_fbo_render_mipmap",
+                        "OES_standard_derivatives",
+                        "OES_texture_float",
+                        "OES_texture_float_linear",
+                        "OES_texture_half_float",
+                        "OES_texture_half_float_linear",
+                        "OES_vertex_array_object",
+                        "WEBGL_color_buffer_float",
+                        "WEBGL_compressed_texture_s3tc",
+                        "WEBGL_compressed_texture_s3tc_srgb",
+                        "WEBGL_debug_renderer_info",
+                        "WEBGL_debug_shaders",
+                        "WEBGL_depth_texture",
+                        "WEBGL_draw_buffers",
+                        "WEBGL_lose_context",
+                        "WEBGL_provoking_vertex"
+                    ].join(";")
                 },
                 {
                     "key": "webgl_extensions_hash",
@@ -306,19 +334,19 @@ export class FunCaptcha {
                 },
                 {
                     "key": "webgl_renderer",
-                    "value": "WebKit WebGL"
+                    "value": "ANGLE (AMD, Radeon HD 3200 Graphics Direct3D11 vs_5_0 ps_5_0)"
                 },
                 {
                     "key": "webgl_vendor",
-                    "value": "WebKit"
+                    "value": "Mozilla"
                 },
                 {
                     "key": "webgl_version",
-                    "value": "WebGL 1.0 (OpenGL ES 2.0 Chromium)"
+                    "value": "WebGL 1.0"
                 },
                 {
                     "key": "webgl_shading_language_version",
-                    "value": "WebGL GLSL ES 1.0 (OpenGL ES GLSL ES 1.0 Chromium)"
+                    "value": "WebGL GLSL ES 1.0"
                 },
                 {
                     "key": "webgl_aliased_line_width_range",
@@ -350,7 +378,7 @@ export class FunCaptcha {
                 },
                 {
                     "key": "webgl_unmasked_renderer",
-                    "value": "ANGLE (AMD, AMD Radeon(TM) Graphics Direct3D11 vs_5_0 ps_5_0, D3D11)"
+                    "value": "ANGLE (AMD, Radeon HD 3200 Graphics Direct3D11 vs_5_0 ps_5_0)"
                 },
                 {
                     "key": "webgl_vsf_params",
@@ -371,144 +399,9 @@ export class FunCaptcha {
                 {
                     "key": "webgl_hash_webgl",
                     "value": "00000000000000000000000000000000"
-                },
-                {
-                    "key": "user_agent_data_brands",
-                    "value": "Not.A/Brand,Chromium"
-                },
-                {
-                    "key": "user_agent_data_mobile",
-                    "value": false
-                },
-                {
-                    "key": "navigator_connection_downlink",
-                    "value": 10
-                },
-                {
-                    "key": "navigator_connection_downlink_max",
-                    "value": null
-                },
-                {
-                    "key": "network_info_rtt",
-                    "value": 50
-                },
-                {
-                    "key": "network_info_save_data",
-                    "value": false
-                },
-                {
-                    "key": "network_info_rtt_type",
-                    "value": null
-                },
-                {
-                    "key": "screen_pixel_depth",
-                    "value": 24
-                },
-                {
-                    "key": "navigator_device_memory",
-                    "value": 8
-                },
-                {
-                    "key": "navigator_languages",
-                    "value": "en-US"
-                },
-                {
-                    "key": "window_inner_width",
-                    "value": 162
-                },
-                {
-                    "key": "window_inner_height",
-                    "value": 150
-                },
-                {
-                    "key": "window_outer_width",
-                    "value": 1536
-                },
-                {
-                    "key": "window_outer_height",
-                    "value": 824
-                },
-                {
-                    "key": "browser_detection_firefox",
-                    "value": false
-                },
-                {
-                    "key": "browser_detection_brave",
-                    "value": false
-                },
-                {
-                    "key": "audio_codecs",
-                    "value": "{\"ogg\":\"probably\",\"mp3\":\"probably\",\"wav\":\"probably\",\"m4a\":\"\",\"aac\":\"\"}"
-                },
-                {
-                    "key": "video_codecs",
-                    "value": "{\"ogg\":\"probably\",\"h264\":\"\",\"webm\":\"probably\",\"mpeg4v\":\"\",\"mpeg4a\":\"\",\"theora\":\"\"}"
-                },
-                {
-                    "key": "media_query_dark_mode",
-                    "value": true
-                },
-                {
-                    "key": "headless_browser_phantom",
-                    "value": false
-                },
-                {
-                    "key": "headless_browser_selenium",
-                    "value": false
-                },
-                {
-                    "key": "headless_browser_nightmare_js",
-                    "value": false
-                },
-                {
-                    "key": "document__referrer",
-                    "value": "https://github.com/"
-                },
-                {
-                    "key": "window__ancestor_origins",
-                    "value": [
-                        "https://github.com"
-                    ]
-                },
-                {
-                    "key": "window__tree_index",
-                    "value": [
-                        0
-                    ]
-                },
-                {
-                    "key": "window__tree_structure",
-                    "value": "[[]]"
-                },
-                {
-                    "key": "window__location_href",
-                    "value": "https://octocaptcha.com/"
-                },
-                {
-                    "key": "client_config__sitedata_location_href",
-                    "value": "https://octocaptcha.com/"
-                },
-                {
-                    "key": "client_config__surl",
-                    "value": null
-                },
-                {
-                    "key": "mobile_sdk__is_sdk"
-                },
-                {
-                    "key": "client_config__language",
-                    "value": null
-                },
-                {
-                    "key": "navigator_battery_charging",
-                    "value": true
-                },
-                {
-                    "key": "audio_fingerprint",
-                    "value": "0"
                 }
             ],
-            webGLKeyValue = {},
+            // webGLKeyValue = {},
             feValues = [],
             fpResult = [
                 {
@@ -531,11 +424,144 @@ export class FunCaptcha {
                     "key": "wh", // Window Hash | Window Proto Chain Hash
                     "value": "e8ba25df3c5e9c242ffe3db75a89da55|72627afbfd19a741c7da1732218301ac"  // Chrome
                 },
+                {
+                    key: "enhanced_fp",
+                    value: [
+                        ...(webGLKeys.map(v => ({key: v.key, value: null}))),
+                        {
+                            "key": "user_agent_data_brands",
+                            "value": null
+                        },
+                        {
+                            "key": "user_agent_data_mobile",
+                            "value": null
+                        },
+                        {
+                            "key": "navigator_connection_downlink",
+                            "value": null
+                        },
+                        {
+                            "key": "navigator_connection_downlink_max",
+                            "value": null
+                        },
+                        {
+                            "key": "network_info_rtt",
+                            "value": null
+                        },
+                        {
+                            "key": "network_info_save_data",
+                            "value": null
+                        },
+                        {
+                            "key": "network_info_rtt_type",
+                            "value": null
+                        },
+                        {
+                            "key": "screen_pixel_depth",
+                            "value": 24
+                        },
+                        {
+                            "key": "navigator_device_memory",
+                            "value": null
+                        },
+                        {
+                            "key": "navigator_languages",
+                            "value": "en-US"
+                        },
+                        {
+                            "key": "window_inner_width",
+                            "value": 766
+                        },
+                        {
+                            "key": "window_inner_height",
+                            "value": 738
+                        },
+                        {
+                            "key": "window_outer_width",
+                            "value": 778
+                        },
+                        {
+                            "key": "window_outer_height",
+                            "value": 829
+                        },
+                        {
+                            "key": "browser_detection_firefox",
+                            "value": false
+                        },
+                        {
+                            "key": "browser_detection_brave",
+                            "value": false
+                        },
+                        {
+                            "key": "audio_codecs",
+                            "value": "{\"ogg\":\"probably\",\"mp3\":\"maybe\",\"wav\":\"probably\",\"m4a\":\"\",\"aac\":\"\"}"
+                        },
+                        {
+                            "key": "video_codecs",
+                            "value": "{\"ogg\":\"probably\",\"h264\":\"probably\",\"webm\":\"probably\",\"mpeg4v\":\"\",\"mpeg4a\":\"\",\"theora\":\"\"}"
+                        },
+                        {
+                            "key": "media_query_dark_mode",
+                            "value": false
+                        },
+                        {
+                            "key": "headless_browser_phantom",
+                            "value": false
+                        },
+                        {
+                            "key": "headless_browser_selenium",
+                            "value": false
+                        },
+                        {
+                            "key": "headless_browser_nightmare_js",
+                            "value": false
+                        },
+                        {
+                            "key": "document__referrer",
+                            "value": ""
+                        },
+                        {
+                            "key": "window__ancestor_origins",
+                            "value": null
+                        },
+                        {
+                            "key": "window__tree_index",
+                            "value": []
+                        },
+                        {
+                            "key": "window__tree_structure",
+                            "value": "[]"
+                        },
+                        {
+                            "key": "window__location_href",
+                            "value": this.captchaEndpoint
+                        },
+                        {
+                            "key": "client_config__sitedata_location_href",
+                            "value": `${this.captchaEndpoint}/github`
+                        },
+                        {
+                            "key": "client_config__surl",
+                            "value": `${this.captchaEndpoint}/github`
+                        },
+                        {
+                            "key": "mobile_sdk__is_sdk"
+                        },
+                        {
+                            "key": "client_config__language",
+                            "value": null
+                        },
+                        {
+                            "key": "audio_fingerprint",
+                            "value": "0"
+                        }
+                    ]
+                }
             ];
 
-        webGLKeys.forEach(x => {
-            webGLKeyValue[x.key] = x.value
-        });
+        // webGLKeys.forEach(x => {
+        //     webGLKeyValue[x.key] = x.value
+        // });
         for (let key in feObjValues) {
             let feObject = feObjValues[key];
             switch (feObject.key) {
@@ -543,7 +569,8 @@ export class FunCaptcha {
                     feValues.push(`${feObject.key}:${L51(feObject.value)}`);
                     break;
                 case "P":
-                    let pluginKeyValue, pluginName = [];
+                    let pluginKeyValue;
+                    const pluginName = [];
                     for (let key in feObject.value) (pluginKeyValue = feObject.value[key]) && pluginName.push(pluginKeyValue.split("::")[0]);
                     feValues.push(`${feObject.key}:${pluginName.join(",")}`);
                     break;
@@ -551,77 +578,76 @@ export class FunCaptcha {
                     feValues.push(`${feObject.key}:${feObject.value}`);
                     break;
             }
-            fpResult.push({
-                key: "enhanced_fp",
-                value: [
-                    ...webGLKeys,
-                    {
-                        "key": "webgl_hash_webgl",
-                        "value": FunCaptchaAPI['x64hash128'](Object.values(Object.keys(webGLKeyValue).sort().reduce((o, k) => {
-                            o[k] = webGLKeyValue[k];
-                            return o
-                        }, {})).join(","))
-                    },
-                    {
-                        "key": "user_agent_data_brands",
-                        "value": " Not A;Brand,Chromium,Google Chrome"
-                    },
-                    {
-                        "key": "user_agent_data_mobile",
-                        "value": false
-                    },
-                    {
-                        "key": "navigator_connection_downlink",
-                        "value": 10
-                    },
-                    {
-                        "key": "navigator_connection_downlink_max",
-                        "value": null
-                    },
-                    {
-                        "key": "network_info_rtt",
-                        "value": 50
-                    },
-                    {
-                        "key": "network_info_save_data",
-                        "value": false
-                    },
-                    {
-                        "key": "network_info_rtt_type",
-                        "value": null
-                    },
-                    {
-                        "key": "screen_pixel_depth",
-                        "value": 24
-                    },
-                    {
-                        "key": "navigator_device_memory",
-                        "value": 2
-                    },
-                    {
-                        "key": "navigator_languages",
-                        "value": "en-US"
-                    },
-                    {
-                        "key": "window_inner_width",
-                        "value": 556
-                    },
-                    {
-                        "key": "window_inner_height",
-                        "value": 150
-                    },
-                    {
-                        "key": "window_outer_width",
-                        "value": null
-                    },
-                    {
-                        "key": "window_outer_height",
-                        "value": null
-                    }
-                ]
-            });
+            // fpResult.push({
+            //     key: "enhanced_fp",
+            //     value: [
+            //         ...webGLKeys,
+            //         {
+            //             "key": "webgl_hash_webgl",
+            //             "value": FunCaptchaAPI['x64hash128'](Object.values(Object.keys(webGLKeyValue).sort().reduce((o, k) => {
+            //                 o[k] = webGLKeyValue[k];
+            //                 return o
+            //             }, {})).join(","))
+            //         },
+            //         {
+            //             "key": "user_agent_data_brands",
+            //             "value": " Not A;Brand,Chromium,Google Chrome"
+            //         },
+            //         {
+            //             "key": "user_agent_data_mobile",
+            //             "value": false
+            //         },
+            //         {
+            //             "key": "navigator_connection_downlink",
+            //             "value": 10
+            //         },
+            //         {
+            //             "key": "navigator_connection_downlink_max",
+            //             "value": null
+            //         },
+            //         {
+            //             "key": "network_info_rtt",
+            //             "value": 50
+            //         },
+            //         {
+            //             "key": "network_info_save_data",
+            //             "value": false
+            //         },
+            //         {
+            //             "key": "network_info_rtt_type",
+            //             "value": null
+            //         },
+            //         {
+            //             "key": "screen_pixel_depth",
+            //             "value": 24
+            //         },
+            //         {
+            //             "key": "navigator_device_memory",
+            //             "value": 2
+            //         },
+            //         {
+            //             "key": "navigator_languages",
+            //             "value": "en-US"
+            //         },
+            //         {
+            //             "key": "window_inner_width",
+            //             "value": 556
+            //         },
+            //         {
+            //             "key": "window_inner_height",
+            //             "value": 150
+            //         },
+            //         {
+            //             "key": "window_outer_width",
+            //             "value": null
+            //         },
+            //         {
+            //             "key": "window_outer_height",
+            //             "value": null
+            //         }
+            //     ]
+            // });
         }
-
         fpResult.push(...[
             {
                 "key": "fe",
@@ -637,7 +663,7 @@ export class FunCaptcha {
             },
             {
                 "key": "jsbd",
-                "value": "{\"HL\":2,\"NCE\":true,\"DT\":\"OctoCaptcha\",\"NWD\":\"false\",\"DMTO\":1,\"DOTO\":1}"
+                "value": '{"HL":1,"NCE":true,"DT":"GitHub","NWD":"false","DOTO":1,"DMTO":1}'
             }
         ]);
         return Buffer.from(cache.buildRequest(JSON.stringify(fpResult), aesSecret)).toString('base64');
@@ -663,7 +689,7 @@ export class FunCaptcha {
 
     async _getImage(url) {
         try {
-            const resp = await fetch(url);
+            const resp = await fetch(url, {headers: {referer: url}});
             if (!resp.ok) return console.error(`Failed to fetch image: ${resp.status} ${resp.statusText}`);
             if (resp.headers.get("content-type").includes("application/json")) {
                 // Decode Encoded Image
@@ -677,6 +703,7 @@ export class FunCaptcha {
             console.error(`Failed to fetch image: ${e}`);
         }
     }
+
     async getCaptchaImageDisplay(imgUrl) {
         const canvas = createCanvas(400, 400), ctx = canvas.getContext('2d');
         ctx.font = "20px Arial";
@@ -737,6 +764,7 @@ export class FunCaptcha {
         if (!await cache.update()) return;
         console.debug("[FunCaptcha] Getting a new token...");
         const browserData = this._generateBDA();
+        // debugger;
         if (!browserData) return console.error("[FunCaptcha] Failed to generate a browser fingerprint.");
         let resp = await fetch(this.captchaEndpoint + `/fc/gt2/public_key/${this.publicKey}`, {
             method: 'POST',
@@ -800,7 +828,13 @@ export class FunCaptcha {
         console.debug('Sending solve request...');
         let resp = await fetch(this.captchaEndpoint + '/fc/ca/', {
             method: 'POST',
-            headers: {'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': this.userAgent},
+            headers: {
+                "Origin": this.captchaEndpoint,
+                "Referer": this.captchaEndpoint,
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'User-Agent': this.userAgent,
+                "X-Requested-With": "XMLHttpRequest"
+            },
             body: new URLSearchParams({
                 game_token: this.challengeID,
                 sid: 'ap-southeast-1',
@@ -810,6 +844,10 @@ export class FunCaptcha {
                 bio: 'eyJtYmlvIjoiIiwidGJpbyI6IiIsImtiaW8iOiIifQ==',
             }),
         });
+        if (resp.status !== 200) {
+            console.error(`[FunCaptcha] Failed to solve: HTTP Status Error ${resp.status} ${resp.statusText}`);
+            return;
+        }
         resp = await resp.json();
         console.debug('Response:', JSON.stringify(resp));
         return resp;
