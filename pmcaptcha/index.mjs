@@ -115,8 +115,8 @@ app.post("/recaptcha_answer", async (req, res) => {
 // endregion
 
 // Uncomment this to enable development environment
-app.listen(8080, "127.0.0.1", () => {
-    console.log(`Dev server is running on port 8080`);
-});
+// app.listen(8080, "127.0.0.1", () => {
+//     console.log(`Dev server is running on port 8080`);
+// });
 
 export default createHandler(app);

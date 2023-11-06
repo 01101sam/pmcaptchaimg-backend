@@ -689,7 +689,10 @@ export class FunCaptcha {
 
     async _getImage(url) {
         try {
-            const resp = await fetch(url, {headers: {referer: url}});
+            const resp = await fetch(url, {headers: {
+                referer: url,
+                "User-Agent": this.userAgent
+            }});
             if (!resp.ok) return console.error(`Failed to fetch image: ${resp.status} ${resp.statusText}`);
             if (resp.headers.get("content-type").includes("application/json")) {
                 // Decode Encoded Image
