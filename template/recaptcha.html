@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>reCAPTCHA</title>
+    <script src="https://www.google.com/recaptcha/{{version}}.js?hl=en&render=explicit&onload=onloadCallback"></script>
+</head>
+<body>
+<div id="container"></div>
+<button id="execute" onclick="(grecaptcha.enterprise || grecaptcha)['execute']()">EXECUTE</button>
+</body>
+</html>

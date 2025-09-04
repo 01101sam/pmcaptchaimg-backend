@@ -51,3 +51,6 @@ __queuestorage__
 __azurite_db*__.json
 
 dev.mjs
+
+package-lock.json
+bun.lockb

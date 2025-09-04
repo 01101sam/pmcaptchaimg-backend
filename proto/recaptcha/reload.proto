@@ -3,11 +3,23 @@ syntax = "proto3";
 message ReloadRequest {
   string version = 1;
   string recaptcha_token = 2;
-  string unknown_field_3 = 3;
-  string bot_guard_token = 4;
-  int32 vi = 5;
+  optional string unknown_field_3 = 3;
+  string bot_guard_response = 4;
+  optional string vi = 5;
   string reload_type = 6;
-  string unknown_field_7 = 7;
+  // Missing in v2 invisible
+  optional string recaptcha_05A_token = 7;
+  // Only in v3
+  optional string v3_action = 8;
+  // ...
   string site_key = 14;
-  string unknown_field_16 = 16;
+  // 15
+  optional string unknown_field_16 = 16;
+  // 17-19
+  optional string unknown_field_20 = 20;
+  optional string unknown_field_21 = 21;
+  // Only in v3
+  optional string unknown_field_22 = 22;
+  // 22-24
+  optional string unknown_field_25 = 25;  // Invis v2: "W10"
 }
